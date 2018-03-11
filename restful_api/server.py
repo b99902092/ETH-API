@@ -1,12 +1,15 @@
 from flask import Flask, request
 from flask_restful import Resource, Api
 from flask_jsonpify import jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import json
 import http.client
-from config import geth_addr
+from config import geth_addr, default_rate_limits
 
 app = Flask(__name__)
 api = Api(app)
+limiter = Limiter(app, key_func=get_remote_address, default_limits=default_rate_limits)
 
 class NodeInfo(Resource):
     def get(self):
