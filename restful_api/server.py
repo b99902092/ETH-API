@@ -9,7 +9,7 @@ api = Api(app)
 
 class NodeInfo(Resource):
     def get(self):
-        params = {'method': "admin_nodeInfo", "id":67}
+        params = {'method': "admin_nodeInfo", "id":1}
         json_params = json.dumps(params)
         headers = {'Content-type': 'application/json'}
         conn = http.client.HTTPConnection("127.0.0.1:8545")
@@ -69,12 +69,49 @@ class TransactionInfo(Resource):
         result_dict['to'] = json_dict['result']['to']
         result_dict['value'] = int(json_dict['result']['value'], 16)
         return jsonify(result_dict)
-        
 
-api.add_resource(NodeInfo, '/node') # Route_1
-api.add_resource(BlockInfo, '/block/<block_number>') # Route_2
-api.add_resource(TransactionInfo, '/transaction/<transaction_hash>') # Route_3
+class Miner(Resource):
+    def put(self):
+        params = {'method': "miner_start", "params":[1], "id":1}
+        json_params = json.dumps(params)
+        headers = {'Content-type': 'application/json'}
+        conn = http.client.HTTPConnection("127.0.0.1:8545")
+        conn.request("POST", "/", json_params, headers)
+        response = conn.getresponse()
+        data = response.read()
+        conn.close()
+
+        json_dict = json.loads(data.decode("utf-8"))
+        if json_dict['result'] == None:
+            result = {"message": "start mining with 1 thread"}
+        else:
+            result = {"error_message": "something wrong"}
+
+        return jsonify(result) 
+
+    def delete(self):
+        params = {'method': "miner_stop", "id":1}
+        json_params = json.dumps(params)
+        headers = {'Content-type': 'application/json'}
+        conn = http.client.HTTPConnection("127.0.0.1:8545")
+        conn.request("POST", "/", json_params, headers)
+        response = conn.getresponse()
+        data = response.read()
+        conn.close()
+
+        json_dict = json.loads(data.decode("utf-8"))
+        if json_dict['result'] == True:
+            result = {"message": "stop mining succesfully"}
+        else:
+            result = {"error_message": "something wrong"}
+
+        return jsonify(result)
+
+api.add_resource(NodeInfo, '/node')
+api.add_resource(BlockInfo, '/block/<block_number>')
+api.add_resource(TransactionInfo, '/transaction/<transaction_hash>')
+api.add_resource(Miner, '/mining')
 
 
 if __name__ == '__main__':
-     app.run(port=5002)
+     app.run(port=5002, debug=True)
