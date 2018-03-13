@@ -1,5 +1,5 @@
 from flask import Flask, request
-from flask_restful import Resource, Api
+from flask_restful import Resource, Api, reqparse
 from flask_jsonpify import jsonify
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -10,6 +10,15 @@ from config import geth_addr, default_rate_limits
 app = Flask(__name__)
 api = Api(app)
 limiter = Limiter(app, key_func=get_remote_address, default_limits=default_rate_limits)
+
+send_transaction_parser = reqparse.RequestParser()
+send_transaction_parser.add_argument('from', type=str, required=True)
+send_transaction_parser.add_argument('to', type=str)
+send_transaction_parser.add_argument('gas', type=int)
+send_transaction_parser.add_argument('gasPrice', type=int)
+send_transaction_parser.add_argument('value', type=int)
+send_transaction_parser.add_argument('data', type=str, required=True)
+send_transaction_parser.add_argument('nonce', type=int)
 
 class NodeInfo(Resource):
     def get(self):
@@ -169,10 +178,43 @@ class Miner(Resource):
 
         return jsonify(result)
 
+class Transaction(Resource):
+    # send Transaction by POST
+    def post(self):
+        args = send_transaction_parser.parse_args()
+        int_to_hex_key = ['gas', 'gasPrice', 'value', 'nonce']
+        for key in int_to_hex_key:
+            if args[key]:
+                args[key] = hex(args[key])
+        params = {'method': "eth_sendTransaction", "params": [args], "id":1}
+        json_params = json.dumps(params)
+        headers = {'Content-type': 'application/json'}
+        conn = http.client.HTTPConnection("127.0.0.1:8545")
+        try:
+            conn.request("POST", "/", json_params, headers)
+            response = conn.getresponse()
+            data = response.read()
+            conn.close()
+        except Exception as error:
+            result = {"error": "The service of Geth may be down.", "error_type": str(type(error))}
+            return jsonify(result)
+
+        json_dict = json.loads(data.decode("utf-8"))
+        result = {}
+        if 'result' in json_dict:
+            result = {"message": "stop mining succesfully"}
+        elif 'error' in json_dict:
+            result['error'] = json_dict['error']
+        else:
+            result = {"error": "something wrong"}
+        
+        return jsonify(result)
+
 api.add_resource(NodeInfo, '/node')
 api.add_resource(BlockInfo, '/block/<block_number>')
 api.add_resource(TransactionInfo, '/transaction/<transaction_hash>')
 api.add_resource(Miner, '/mining')
+api.add_resource(Transaction, '/transaction')
 
 
 if __name__ == '__main__':
